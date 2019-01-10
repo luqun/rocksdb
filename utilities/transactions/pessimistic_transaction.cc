@@ -364,7 +364,7 @@ Status WriteCommittedTxn::CommitInternal() {
   auto s =
       db_impl_->WriteImpl(write_options_, working_batch, /*callback*/ nullptr,
                           /*log_used*/ nullptr, /*log_ref*/ log_number_,
-                          /*disable_memtable*/ false, &seq_used);  
+                          /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
   if (s.ok()) {
     SetId(seq_used);
@@ -470,6 +470,12 @@ Status PessimisticTransaction::LockBatch(WriteBatch* batch,
     virtual Status DeleteCF(uint32_t column_family_id,
                             const Slice& key) override {
       RecordKey(column_family_id, key);
+      return Status::OK();
+    }
+    virtual Status DeleteRangeCF(uint32_t /*column_family_id*/,
+                                 const Slice& /*begin_key*/,
+                                 const Slice& /*end_key*/) override {
+      // TODO: Add range lock support
       return Status::OK();
     }
   };
