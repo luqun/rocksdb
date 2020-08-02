@@ -601,6 +601,7 @@ uint64_t TransactionBaseImpl::GetNumDeletes() const { return num_deletes_; }
 uint64_t TransactionBaseImpl::GetNumMerges() const { return num_merges_; }
 
 uint64_t TransactionBaseImpl::GetNumKeys() const {
+#ifndef NDEBUG
   uint64_t count = 0;
 
   // sum up locked keys in all column families
@@ -608,15 +609,18 @@ uint64_t TransactionBaseImpl::GetNumKeys() const {
     const auto& keys = key_map_iter.second;
     count += keys.size();
   }
-
-  return count;
+  assert(count == num_keys_);
+  return num_keys_;
+#else
+  return num_keys_;
+#endif
 }
 
 void TransactionBaseImpl::TrackKey(uint32_t cfh_id, const std::string& key,
                                    SequenceNumber seq, bool read_only,
                                    bool exclusive) {
   // Update map of all tracked keys for this transaction
-  TrackKey(&tracked_keys_, cfh_id, key, seq, read_only, exclusive);
+  TrackKey(&tracked_keys_, cfh_id, key, seq, read_only, exclusive, &num_keys_);
 
   if (save_points_ != nullptr && !save_points_->empty()) {
     // Update map of tracked keys in this SavePoint
@@ -630,7 +634,8 @@ void TransactionBaseImpl::TrackKey(uint32_t cfh_id, const std::string& key,
 // there has not been a concurrent update to the key.
 void TransactionBaseImpl::TrackKey(TransactionKeyMap* key_map, uint32_t cfh_id,
                                    const std::string& key, SequenceNumber seq,
-                                   bool read_only, bool exclusive) {
+                                   bool read_only, bool exclusive,
+                                   uint64_t* num_keys) {
   auto& cf_key_map = (*key_map)[cfh_id];
 #ifdef __cpp_lib_unordered_map_try_emplace
   // use c++17's try_emplace if available, to avoid rehashing the key
@@ -640,12 +645,15 @@ void TransactionBaseImpl::TrackKey(TransactionKeyMap* key_map, uint32_t cfh_id,
   if (!result.second && seq < iter->second.seq) {
     // Now tracking this key with an earlier sequence number
     iter->second.seq = seq;
+  } else if (result.second && num_keys != nullptr) {
+    (*num_keys)++:
   }
 #else
   auto iter = cf_key_map.find(key);
   if (iter == cf_key_map.end()) {
     auto result = cf_key_map.emplace(key, TransactionKeyMapInfo(seq));
     iter = result.first;
+    if (num_keys != nullptr) (*num_keys)++;
   } else if (seq < iter->second.seq) {
     // Now tracking this key with an earlier sequence number
     iter->second.seq = seq;

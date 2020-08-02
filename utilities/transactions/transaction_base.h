@@ -263,7 +263,8 @@ class TransactionBaseImpl : public Transaction {
   // Helper function to add a key to the given TransactionKeyMap
   static void TrackKey(TransactionKeyMap* key_map, uint32_t cfh_id,
                        const std::string& key, SequenceNumber seqno,
-                       bool readonly, bool exclusive);
+                       bool readonly, bool exclusive,
+                       uint64_t* num_keys = nullptr);
 
   // Called when UndoGetForUpdate determines that this key can be unlocked.
   virtual void UnlockGetForUpdate(ColumnFamilyHandle* column_family,
@@ -301,6 +302,7 @@ class TransactionBaseImpl : public Transaction {
   uint64_t num_puts_ = 0;
   uint64_t num_deletes_ = 0;
   uint64_t num_merges_ = 0;
+  uint64_t num_keys_ = 0;
 
   struct SavePoint {
     std::shared_ptr<const Snapshot> snapshot_;
